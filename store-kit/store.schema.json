@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ash Store manifest (store.json)",
+  "type": "object",
+  "required": ["id", "name", "repo", "package", "tagline", "homepage"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Slug. Release asset is <id>.apk; equals STORE_ID in the Makefile." },
+    "name": { "type": "string" },
+    "repo": { "type": "string", "pattern": "^[^/]+/[^/]+$", "description": "owner/name on GitHub." },
+    "package": { "type": "string", "pattern": "^[a-zA-Z][\\w]*(\\.[a-zA-Z][\\w]*)+$", "description": "Android applicationId." },
+    "tagline": { "type": "string", "maxLength": 100 },
+    "description": { "type": "string" },
+    "category": { "type": "string" },
+    "icon": { "type": "string", "description": "Repo-relative path or URL to a square PNG." },
+    "homepage": { "type": "string", "format": "uri" },
+    "listed": { "type": "boolean", "default": true },
+    "catalog": { "type": "boolean", "default": false, "description": "Only for Ash Store: landing page lists every app." }
+  }
+}

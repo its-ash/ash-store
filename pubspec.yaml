@@ -1,0 +1,26 @@
+name: ash_store
+description: "Ash Store: install and update its-ash Android apps from GitHub releases."
+publish_to: 'none'
+version: 1.0.1+2
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  theme:
+    path: ../theme
+
+  http: ^1.2.2
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
