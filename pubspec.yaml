@@ -1,7 +1,7 @@
 name: ash_store
 description: "Ash Store: install and update its-ash Android apps from GitHub releases."
 publish_to: 'none'
-version: 1.0.3+4
+version: 1.0.4+5
 
 environment:
   sdk: ^3.12.2

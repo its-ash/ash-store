@@ -38,6 +38,8 @@ class SettingsScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: UiSpace.lg),
+          const UiAppearanceSection(),
+          const SizedBox(height: UiSpace.lg),
           const UiUpdateSection(storeId: 'ash-store'),
           const SizedBox(height: UiSpace.lg),
           const UiDeveloperSection(),
