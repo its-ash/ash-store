@@ -6,7 +6,7 @@
   "tagline": "Install and update every its-ash Android app in one place.",
   "description": "Ash Store lists every its-ash Android app, straight from GitHub releases. Install an app with one tap, see when an update is out, and update it in place. No account and no tracking: the store reads public GitHub data and downloads the APK the app's own repo published.",
   "category": "Tools",
-  "icon": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+  "icon": "assets/icon/logo-1024.png",
   "homepage": "https://store.itsash.in/",
   "catalog": true
 }
