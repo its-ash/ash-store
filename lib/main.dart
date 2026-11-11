@@ -4,6 +4,9 @@ import 'package:theme/theme.dart';
 import 'src/home_screen.dart';
 import 'src/store_controller.dart';
 
+/// Store accent: a Play-style green. The theme lightens it in dark mode.
+const storeGreen = Color(0xFF01875F);
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final store = StoreController()..init();
@@ -18,7 +21,7 @@ class AshStoreApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return StoreScope(
       controller: store,
-      child: const UiApp(title: 'Ash Store', home: HomeScreen()),
+      child: const UiApp(title: 'Ash Store', accent: storeGreen, home: HomeScreen()),
     );
   }
 }

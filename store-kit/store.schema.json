@@ -14,6 +14,7 @@
     "category": { "type": "string" },
     "icon": { "type": "string", "description": "Repo-relative path or URL to a square PNG." },
     "homepage": { "type": "string", "format": "uri" },
+    "screenshots": { "type": "array", "items": { "type": "string" }, "description": "Optional. Repo-relative paths or URLs of screenshots shown on the app page." },
     "listed": { "type": "boolean", "default": true },
     "catalog": { "type": "boolean", "default": false, "description": "Only for Ash Store: landing page lists every app." }
   }

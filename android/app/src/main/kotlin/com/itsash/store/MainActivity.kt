@@ -1,11 +1,16 @@
 package com.itsash.store
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
-import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,31 +18,48 @@ import java.io.File
 
 /**
  * Bridge for the parts of a store that need the Android package manager:
- * installed versions, the "install unknown apps" permission, APK installs,
- * launching and uninstalling apps.
+ * installed versions, the "install unknown apps" permission, PackageInstaller
+ * installs, launching and uninstalling apps.
  */
 class MainActivity : FlutterActivity() {
+    companion object {
+        const val ACTION_INSTALL_RESULT = "com.itsash.store.INSTALL_RESULT"
+        const val EXTRA_PACKAGE = "com.itsash.store.PACKAGE"
+
+        /** Set while the Flutter engine is alive; install results are forwarded to Dart. */
+        @Volatile
+        var channel: MethodChannel? = null
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.itsash.store/packages")
-            .setMethodCallHandler { call, result ->
-                try {
-                    when (call.method) {
-                        "installedVersion" -> result.success(installedVersion(call.argument<String>("package")!!))
-                        "canInstall" -> result.success(canInstall())
-                        "openInstallSettings" -> {
-                            openInstallSettings()
-                            result.success(null)
-                        }
-                        "install" -> result.success(install(call.argument<String>("path")!!))
-                        "launch" -> result.success(launch(call.argument<String>("package")!!))
-                        "uninstall" -> result.success(uninstall(call.argument<String>("package")!!))
-                        else -> result.notImplemented()
+        val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.itsash.store/packages")
+        channel = ch
+        ch.setMethodCallHandler { call, result ->
+            try {
+                when (call.method) {
+                    "installedVersion" -> result.success(installedVersion(call.argument<String>("package")!!))
+                    "canInstall" -> result.success(canInstall())
+                    "openInstallSettings" -> {
+                        openInstallSettings()
+                        result.success(null)
                     }
-                } catch (e: Exception) {
-                    result.error("package_error", e.message, null)
+                    "install" -> result.success(
+                        install(call.argument<String>("path")!!, call.argument<String>("package")!!),
+                    )
+                    "launch" -> result.success(launch(call.argument<String>("package")!!))
+                    "uninstall" -> result.success(uninstall(call.argument<String>("package")!!))
+                    else -> result.notImplemented()
                 }
+            } catch (e: Exception) {
+                result.error("package_error", e.message, null)
             }
+        }
+    }
+
+    override fun onDestroy() {
+        channel = null
+        super.onDestroy()
     }
 
     private fun installedVersion(pkg: String): Map<String, Any>? = try {
@@ -70,15 +92,50 @@ class MainActivity : FlutterActivity() {
         startActivity(intent)
     }
 
-    private fun install(path: String): Boolean {
+    /**
+     * Streams the APK into a PackageInstaller session and commits it. The outcome
+     * arrives in [InstallResultReceiver] and is forwarded to Dart as `installResult`.
+     * Returns false when the file is missing.
+     */
+    private fun install(path: String, pkg: String): Boolean {
         val file = File(path)
         if (!file.exists()) return false
-        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val installer = packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(pkg)
+            setSize(file.length())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Updates of apps this store installed need no dialog (Android 12+).
+                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Become the update owner so later updates stay silent (Android 14+).
+                setRequestUpdateOwnership(true)
+            }
         }
-        startActivity(intent)
+        val id = installer.createSession(params)
+        val session = installer.openSession(id)
+        try {
+            file.inputStream().use { input ->
+                session.openWrite("base.apk", 0, file.length()).use { out ->
+                    input.copyTo(out)
+                    session.fsync(out)
+                }
+            }
+            val intent = Intent(this, InstallResultReceiver::class.java)
+                .setAction(ACTION_INSTALL_RESULT)
+                .putExtra(EXTRA_PACKAGE, pkg)
+            // Mutable: the system adds the status extras.
+            var flags = PendingIntent.FLAG_UPDATE_CURRENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags = flags or PendingIntent.FLAG_MUTABLE
+            val pending = PendingIntent.getBroadcast(this, id, intent, flags)
+            session.commit(pending.intentSender)
+        } catch (e: Exception) {
+            session.abandon()
+            throw e
+        } finally {
+            session.close()
+        }
         return true
     }
 
@@ -92,5 +149,34 @@ class MainActivity : FlutterActivity() {
         val intent = Intent(Intent.ACTION_DELETE, Uri.parse("package:$pkg"))
         startActivity(intent)
         return true
+    }
+}
+
+/** Receives PackageInstaller session results. */
+class InstallResultReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)
+        val pkg = intent.getStringExtra(MainActivity.EXTRA_PACKAGE) ?: ""
+        if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            // First install (or an update Android wants confirmed): one system dialog.
+            @Suppress("DEPRECATION")
+            val confirm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)
+            } else {
+                intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+            }
+            if (confirm != null) {
+                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(confirm)
+            }
+            return
+        }
+        val args = mapOf(
+            "package" to pkg,
+            "success" to (status == PackageInstaller.STATUS_SUCCESS),
+            "status" to status,
+            "message" to (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: ""),
+        )
+        Handler(Looper.getMainLooper()).post { MainActivity.channel?.invokeMethod("installResult", args) }
     }
 }

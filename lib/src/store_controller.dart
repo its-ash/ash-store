@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -35,6 +36,15 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
   /// Download progress per app id: 0..1, or null while the size is unknown.
   final Map<String, double?> downloads = {};
 
+  /// App ids whose PackageInstaller session is running (until Android reports back).
+  final Set<String> installing = {};
+
+  final _outcomes = StreamController<(StoreApp, InstallOutcome)>.broadcast();
+  StreamSubscription<InstallOutcome>? _resultSub;
+
+  /// Finished installs (success or failure), so the UI can show a message.
+  Stream<(StoreApp, InstallOutcome)> get outcomes => _outcomes.stream;
+
   /// App to install once the user grants the install permission.
   StoreApp? _pending;
 
@@ -42,6 +52,7 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> init() async {
     WidgetsBinding.instance.addObserver(this);
+    listenForResults();
     final cached = await _service.cached();
     if (cached != null) {
       catalog = cached;
@@ -51,8 +62,23 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
     await refresh();
   }
 
+  /// Starts listening to install results from Android. Called by [init].
+  void listenForResults() {
+    _resultSub ??= Packages.results.listen(_onResult);
+  }
+
+  Future<void> _onResult(InstallOutcome o) async {
+    final app = apps.where((a) => a.package == o.package).firstOrNull;
+    if (app != null) installing.remove(app.id);
+    notifyListeners();
+    await refreshInstalled();
+    if (app != null && !_outcomes.isClosed) _outcomes.add((app, o));
+  }
+
   @override
   void dispose() {
+    _resultSub?.cancel();
+    _outcomes.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -110,13 +136,17 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
 
   bool isDownloading(StoreApp app) => downloads.containsKey(app.id);
 
-  /// Downloads the latest APK and opens the system installer. Returns
+  bool isInstalling(StoreApp app) => installing.contains(app.id);
+
+  /// Downloads the latest APK and installs it with a PackageInstaller session
+  /// (no dialog for updates on Android 12+, one confirm for a first install).
+  /// The final result arrives later through [outcomes]. Returns
   /// [InstallResult.needsPermission] when "Install unknown apps" is off; the
   /// install then continues by itself once the user turns it on.
   Future<InstallResult> install(StoreApp app) async {
     final release = app.release;
     if (release?.apkUrl == null) return InstallResult.unavailable;
-    if (isDownloading(app)) return InstallResult.started;
+    if (isDownloading(app) || isInstalling(app)) return InstallResult.started;
     try {
       canInstall = await Packages.canInstall();
     } catch (_) {}
@@ -127,8 +157,15 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
     }
     try {
       final file = await _download(app, release!);
-      return await Packages.install(file.path) ? InstallResult.started : InstallResult.failed;
+      installing.add(app.id);
+      notifyListeners();
+      if (await Packages.install(file.path, app.package)) return InstallResult.started;
+      installing.remove(app.id);
+      notifyListeners();
+      return InstallResult.failed;
     } catch (_) {
+      installing.remove(app.id);
+      notifyListeners();
       return InstallResult.failed;
     }
   }

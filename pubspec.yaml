@@ -1,7 +1,7 @@
 name: ash_store
 description: "Ash Store: install and update its-ash Android apps from GitHub releases."
 publish_to: 'none'
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ^3.12.2
@@ -24,3 +24,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/logo-1024.png

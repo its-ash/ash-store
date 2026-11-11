@@ -11,6 +11,7 @@ class StoreManifest {
     this.category = 'Apps',
     this.icon,
     this.homepage,
+    this.screenshots = const [],
     this.listed = true,
   });
 
@@ -23,6 +24,7 @@ class StoreManifest {
         category: j['category'] as String? ?? 'Apps',
         icon: j['icon'] as String?,
         homepage: j['homepage'] as String?,
+        screenshots: [for (final s in (j['screenshots'] as List? ?? const [])) s.toString()],
         listed: j['listed'] as bool? ?? true,
       );
 
@@ -40,6 +42,9 @@ class StoreManifest {
   final String? icon;
   final String? homepage;
 
+  /// Optional repo-relative paths or URLs of screenshots (detail page carousel).
+  final List<String> screenshots;
+
   /// False hides the app from the catalog (e.g. not ready yet).
   final bool listed;
 
@@ -52,6 +57,7 @@ class StoreManifest {
         'category': category,
         'icon': icon,
         'homepage': homepage,
+        'screenshots': screenshots,
         'listed': listed,
       };
 }
@@ -160,6 +166,11 @@ class StoreApp {
   }
 
   String get homepage => manifest.homepage ?? htmlUrl;
+
+  List<String> get screenshotUrls => [
+        for (final s in manifest.screenshots)
+          if (s.startsWith('http')) s else StoreConfig.rawUrl(repo, branch, s),
+      ];
 
   Map<String, dynamic> toJson() => {
         'repo': repo,

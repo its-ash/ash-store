@@ -6,12 +6,20 @@ Install and update every its-ash Android app in one place.
 
 ## Features
 
+- **Familiar store layout**: green-accent Apps / Search / Updates / Settings
+  tabs, a For you home with carousels, Top charts, Categories, live search and
+  full app pages with similar apps.
 - **Catalog from GitHub**: lists every `its-ash` repo tagged `ash-store` that
   has a `store.json` and a release APK. No central list to keep up to date.
-- **One-tap install**: downloads the APK from the app's latest GitHub release
-  and opens the Android installer.
+- **Direct install**: downloads the APK from the app's latest GitHub release
+  and installs it itself with Android's PackageInstaller (no browser, no
+  installer screen to hunt for). The first install of each app shows one system
+  confirmation (an Android rule). Updates of apps the store installed earlier are
+  silent on Android 12+ (and stay silent on Android 14+ once the store is the
+  update owner). Google Play Protect may still offer to scan an app; that prompt
+  belongs to Google and cannot be turned off by an app.
 - **Updates**: compares the installed version with the latest release and shows
-  an Update button and an "Updates" filter. The store updates itself the same way.
+  an Update button, an Updates tab with a count badge and "Update all". The store updates itself the same way.
 - **Open and uninstall** installed apps.
 - **Works offline-first**: the catalog is cached for 15 minutes and the cached
   copy is shown if GitHub can't be reached or the rate limit is hit.
@@ -25,7 +33,8 @@ Android asks.
 
 The first time you install an app from the store, Android asks you to allow
 Ash Store to **install unknown apps**. The store opens that setting for you,
-and the install continues when you come back.
+and the install continues when you come back. After that: one confirm per new
+app, silent updates on Android 12+.
 
 ## Develop
 
