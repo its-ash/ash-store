@@ -6,6 +6,7 @@ import 'package:ash_store/src/catalog.dart';
 import 'package:ash_store/src/models.dart';
 import 'package:ash_store/src/packages.dart';
 import 'package:ash_store/src/store_controller.dart';
+import 'package:ash_store/src/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:theme/theme.dart';
@@ -123,6 +124,7 @@ void main() {
     });
 
     test('topCharts ranks by stars, byCategory by size, similarTo skips self', () {
+      expect(allByName(apps).map((a) => a.id), ['alpha', 'beta', 'delta', 'gamma']);
       expect(topCharts(apps).map((a) => a.id), ['beta', 'alpha', 'gamma', 'delta']);
       expect(byCategory(apps).keys.first, 'Tools');
       expect(recentlyUpdated(apps).first.id, 'gamma');
@@ -194,12 +196,21 @@ void main() {
   });
 
   group('screens at 320 px', () {
-    testWidgets('For you shows carousels, then Top charts and Categories', (tester) async {
+    testWidgets('For you lists all apps, then Top charts and Categories', (tester) async {
       await pumpStore(tester, controllerWith(apps));
       expect(find.text('Search apps'), findsOneWidget);
       expect(find.text('For you'), findsOneWidget);
       expect(find.text('NEW & UPDATED'), findsOneWidget);
-      expect(find.text('Tools'), findsWidgets);
+      expect(find.text('All apps'), findsOneWidget);
+      expect(find.text('4 apps'), findsOneWidget);
+      // No per-category carousels on the home list.
+      expect(find.byType(AppCarousel), findsNothing);
+      for (final name in ['Alpha', 'Beta', 'Delta']) {
+        await tester.scrollUntilVisible(find.text(name).last, 200, scrollable: find.byType(Scrollable).last);
+        expect(find.text(name), findsWidgets);
+      }
+      await tester.drag(find.byType(Scrollable).last, const Offset(0, 2000));
+      await step(tester);
       expect(find.text('Apps'), findsOneWidget); // bottom nav
 
       await tester.tap(find.text('Top charts'));

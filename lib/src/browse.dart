@@ -18,6 +18,10 @@ List<StoreApp> searchApps(Iterable<StoreApp> apps, String query) {
   ];
 }
 
+/// Every app, alphabetical by name (home screen list).
+List<StoreApp> allByName(Iterable<StoreApp> apps) =>
+    apps.toList()..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
 /// Ranked list: most starred first, then most recently released, then name.
 List<StoreApp> topCharts(Iterable<StoreApp> apps) {
   final list = apps.toList();

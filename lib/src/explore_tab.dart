@@ -7,7 +7,8 @@ import 'models.dart';
 import 'store_controller.dart';
 import 'widgets.dart';
 
-/// Apps tab: search bar, "For you / Top charts / Categories" tabs.
+/// Apps tab: search bar, "For you / Top charts / Categories" tabs. For you lists
+/// every app in one list; browsing by category lives in the Categories tab.
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key, required this.onSearch, required this.onSettings});
 
@@ -118,8 +119,8 @@ class _ForYou extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categories = byCategory(apps);
     final recent = recentlyUpdated(apps);
+    final all = allByName(apps);
     return ListView(
       padding: const EdgeInsets.only(top: UiSpace.sm, bottom: UiSpace.xxl),
       children: [
@@ -129,13 +130,11 @@ class _ForYou extends StatelessWidget {
         else ...[
           if (recent.isNotEmpty) _FeaturedCard(recent.first),
           const SizedBox(height: UiSpace.lg),
-          for (final e in categories.entries)
-            AppCarousel(
-              title: e.key,
-              apps: e.value,
-              onMore: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CategoryScreen(e.key))),
-            ),
-          AppCarousel(title: 'Recently updated', apps: recent),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: UiSpace.page),
+            child: UiSectionHeader('All apps', subtitle: '${all.length} apps'),
+          ),
+          for (final a in all) AppRowTile(a),
         ],
       ],
     );
