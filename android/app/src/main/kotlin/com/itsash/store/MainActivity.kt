@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.concurrent.Executors
 
 /**
  * Bridge for the parts of a store that need the Android package manager:
@@ -22,6 +23,9 @@ import java.io.File
  * installs, launching and uninstalling apps.
  */
 class MainActivity : FlutterActivity() {
+    private val io = Executors.newSingleThreadExecutor()
+    private val ui = Handler(Looper.getMainLooper())
+
     companion object {
         const val ACTION_INSTALL_RESULT = "com.itsash.store.INSTALL_RESULT"
         const val EXTRA_PACKAGE = "com.itsash.store.PACKAGE"
@@ -44,9 +48,18 @@ class MainActivity : FlutterActivity() {
                         openInstallSettings()
                         result.success(null)
                     }
-                    "install" -> result.success(
-                        install(call.argument<String>("path")!!, call.argument<String>("package")!!),
-                    )
+                    "install" -> {
+                        val path = call.argument<String>("path")!!
+                        val pkg = call.argument<String>("package")!!
+                        io.execute {
+                            try {
+                                val ok = install(path, pkg)
+                                ui.post { result.success(ok) }
+                            } catch (e: Exception) {
+                                ui.post { result.error("package_error", e.message, null) }
+                            }
+                        }
+                    }
                     "launch" -> result.success(launch(call.argument<String>("package")!!))
                     "uninstall" -> result.success(uninstall(call.argument<String>("package")!!))
                     else -> result.notImplemented()
@@ -59,6 +72,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         channel = null
+        io.shutdown()
         super.onDestroy()
     }
 
@@ -100,7 +114,8 @@ class MainActivity : FlutterActivity() {
     private fun install(path: String, pkg: String): Boolean {
         val file = File(path)
         if (!file.exists()) return false
-        val installer = packageManager.packageInstaller
+        val ctx = applicationContext
+        val installer = ctx.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
             setAppPackageName(pkg)
             setSize(file.length())
@@ -122,13 +137,13 @@ class MainActivity : FlutterActivity() {
                     session.fsync(out)
                 }
             }
-            val intent = Intent(this, InstallResultReceiver::class.java)
+            val intent = Intent(ctx, InstallResultReceiver::class.java)
                 .setAction(ACTION_INSTALL_RESULT)
                 .putExtra(EXTRA_PACKAGE, pkg)
             // Mutable: the system adds the status extras.
             var flags = PendingIntent.FLAG_UPDATE_CURRENT
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags = flags or PendingIntent.FLAG_MUTABLE
-            val pending = PendingIntent.getBroadcast(this, id, intent, flags)
+            val pending = PendingIntent.getBroadcast(ctx, id, intent, flags)
             session.commit(pending.intentSender)
         } catch (e: Exception) {
             session.abandon()
@@ -167,9 +182,8 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
             if (confirm != null) {
                 confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(confirm)
+                if (runCatching { context.startActivity(confirm) }.isSuccess) return
             }
-            return
         }
         val args = mapOf(
             "package" to pkg,

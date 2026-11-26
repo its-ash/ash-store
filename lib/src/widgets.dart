@@ -106,7 +106,7 @@ Future<InstallResult> runInstall(BuildContext context, StoreApp app) async {
 /// Updates every app with a new version, one after the other.
 Future<void> updateAll(BuildContext context) async {
   final store = StoreScope.of(context);
-  for (final app in store.updates) {
+  for (final app in store.updates.where((a) => !a.isSelf).toList()) {
     if (!context.mounted) return;
     final result = await runInstall(context, app);
     if (result != InstallResult.started) return;

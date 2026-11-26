@@ -97,8 +97,7 @@ class _SearchBar extends StatelessWidget {
                         padding: const EdgeInsets.all(UiSpace.sm + 2),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          // Pixel-art logo: nearest-neighbour scaling keeps the cells crisp.
-                          child: Image.asset('assets/icon/logo-1024.png', width: 32, height: 32, filterQuality: FilterQuality.none),
+                          child: Image.asset('assets/icon/logo-1024.png', width: 32, height: 32, filterQuality: FilterQuality.medium),
                         ),
                       ),
                     ),

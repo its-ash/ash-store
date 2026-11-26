@@ -155,8 +155,12 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return InstallResult.needsPermission;
     }
+    if (isDownloading(app) || isInstalling(app)) return InstallResult.started;
+    downloads[app.id] = null;
+    notifyListeners();
     try {
       final file = await _download(app, release!);
+      downloads.remove(app.id);
       installing.add(app.id);
       notifyListeners();
       if (await Packages.install(file.path, app.package)) return InstallResult.started;
@@ -164,6 +168,7 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return InstallResult.failed;
     } catch (_) {
+      downloads.remove(app.id);
       installing.remove(app.id);
       notifyListeners();
       return InstallResult.failed;
@@ -184,8 +189,6 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
       if (f is File && f.uri.pathSegments.last.startsWith('${app.id}-')) await f.delete();
     }
 
-    downloads[app.id] = null;
-    notifyListeners();
     final part = File('${file.path}.part');
     try {
       final res = await _client.send(http.Request('GET', Uri.parse(release.apkUrl!)));
@@ -213,9 +216,6 @@ class StoreController extends ChangeNotifier with WidgetsBindingObserver {
     } catch (_) {
       if (await part.exists()) await part.delete();
       rethrow;
-    } finally {
-      downloads.remove(app.id);
-      notifyListeners();
     }
   }
 }
